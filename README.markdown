@@ -1,7 +1,9 @@
 # Vaughan
 
 Vaughan is F# implementation of a generic Top-Down-Operator-Precedence Parser 
-as described in this paper http://portal.acm.org/citation.cfm?id=512931.
+as described in this paper http://portal.acm.org/citation.cfm?id=512931. It 
+borrows the name from the algorithms original inventor 
+[Vaughan Pratt](http://en.wikipedia.org/wiki/Vaughan_Pratt)
 
 It has been extended to allow for statements in comparison to Pratt's
 original algorithm which only parsed languages which use expression-only grammar.
@@ -18,10 +20,3 @@ Pretty printed error messages are produced, such as:
     5:   print'x equals y');
     ----------^
     Unexpected: #string "x equals y"
-
-## More Information
-
- * http://en.wikipedia.org/wiki/Vaughan_Pratt (Original Inventor)
- * http://en.wikipedia.org/wiki/Pratt_parser (Alias name)
- * http://effbot.org/zone/simple-top-down-parsing.htm (Python implementation)
- * http://javascript.crockford.com/tdop/tdop.html (JavaScript implementation)
