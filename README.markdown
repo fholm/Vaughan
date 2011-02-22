@@ -1,9 +1,9 @@
 # Vaughan
 
-Vaughan is F# implementation of a generic Top-Down-Operator-Precedence Parser 
-as described in this paper http://portal.acm.org/citation.cfm?id=512931. It 
+Vaughan is an F# implementation of a generic Top-Down-Operator-Precedence Parser 
+as described in [this paper](http://portal.acm.org/citation.cfm?id=512931), it 
 borrows the name from the algorithms original inventor 
-[Vaughan Pratt](http://en.wikipedia.org/wiki/Vaughan_Pratt)
+[Vaughan Pratt](http://en.wikipedia.org/wiki/Vaughan_Pratt).
 
 It has been extended to allow for statements in comparison to Pratt's
 original algorithm which only parsed languages which use expression-only grammar.
