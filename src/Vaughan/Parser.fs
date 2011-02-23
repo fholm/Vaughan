@@ -44,10 +44,6 @@ module Parser =
       Stmt : Map<'c, 'a -> T<'a, 'b, 'c> -> 'b>
       Left : Map<'c, 'a -> 'b -> T<'a, 'b, 'c> -> 'b>
   }
-  
-  type Pattern<'a, 'b, 'c> when 'c : comparison 
-    = Sym of 'c
-    | Get of (T<'a, 'b, 'c> -> 'b)
 
   //Errors
   type Exn (msg, pos) = 
@@ -169,6 +165,15 @@ module Parser =
       unexpectedToken token parser
 
     | _ -> unexpectedEnd ()
+    
+  (*Tries to skip the current token if it's type is equal to @type'*)
+  let skipIfTry type' parser =
+    match !parser.Input with
+    | token::xs when parser.Type token = type' -> 
+      parser.Input := xs
+      true
+
+    | _ -> false
 
   (*Gets the current token, skips it and then returns it*)
   let skipCurrent parser =
@@ -206,8 +211,8 @@ module Parser =
   let expr parser = 
     parser |> exprPwr 0
     
-  (*Gets an expression, and then skips the next token if it's type matches @type'*)
-  let exprSkip type' parser =
+  (*Gets an expression and then skips the next token if it's type matches @type'*)
+  let exprAndSkip type' parser =
     let expr = parser |> expr
     parser |> skipIf type'
     expr
@@ -223,29 +228,13 @@ module Parser =
     let token = parser |> current
     match parser.Stmt.TryFind (token |> parser.Type) with
     | Some stmt -> parser |> skip; stmt token parser
-    | None -> parser |> exprSkip term
+    | None -> parser |> exprAndSkip term
     
   (*Tries to parse the whole input as a list of statements or expressions ending with @term*)
   let rec stmtList term parser =
     match !parser.Input with
     | [] -> []
     | _ -> (parser |> stmt term) :: (parser |> stmtList term)
-    
-  (*Matches the current input, as far as needed, against the @pattern supplied*)
-  let match' pattern parser =
-    let rec match' acc pattern parser =
-      match pattern with
-      | [] -> acc |> List.rev
-
-      | Sym(symbol)::pattern -> 
-        parser |> skipIf symbol
-        parser |> match' acc pattern
-
-      | Get(f)::pattern ->
-        let acc = (f parser) :: acc
-        parser |> match' acc pattern 
-
-    parser |> match' [] pattern
 
   (*
     Convenience functions exposed for 
@@ -266,7 +255,6 @@ module Parser =
     Left = Map.empty<'c, 'a -> 'b -> T<'a, 'b, 'c> -> 'b>
   }
   
-  let matchError () = exn "Vaughan.Parser.Pattern<_, _, _> failed to match"
   let smd token funct parser = {parser with T.Stmt = parser.Stmt.Add(token, funct)}
   let nud token funct parser = {parser with T.Null = parser.Null.Add(token, funct)}
   let led token funct parser = {parser with T.Left = parser.Left.Add(token, funct)}

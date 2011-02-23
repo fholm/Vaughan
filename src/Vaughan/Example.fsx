@@ -139,28 +139,32 @@ let example_parser =
   |> prefix "-" 70
   
   //Grouping expressions (<expr>)
-  |> P.nud "(" (fun t p -> p |> P.exprSkip ")")
+  |> P.nud "(" (fun t p -> p |> P.exprAndSkip ")")
 
   //Ternary operator <expr> ? <expr> : <expr>
   |> P.bpw "?" 70
-  |> P.led "?" (fun _ left p ->
-      let ternary = [P.Get P.expr; P.Sym ":"; P.Get P.expr]
-      match p |> P.match' ternary with
-      | ifTrue::ifFalse::_ -> Ternary(left, ifTrue, ifFalse)
-      | _ -> P.matchError()
+  |> P.led "?" (fun _ test p ->
+                                // test ?
+      let ifTrue = p |> P.expr  // ifTrue
+      p |> P.skipIf ":"         // :
+      let ifFalse = p |> P.expr // ifFalse
+
+      Ternary(test, ifTrue, ifFalse)
     )
 
   //If/Else statement if(<condition>) { <exprs } [else { <exprs> }]
   |> P.smd "if" (fun _ p ->
-      let if' = [P.Sym "("; P.Get P.expr; P.Sym ")"; P.Get block]
-      let else' = [P.Sym "else"; P.Get block]
+      // if(<test>
+      p |> P.skipIf "("
+      let test = p |> P.expr
 
-      match p |> P.match' if' with
-      | test::ifTrue::_ -> 
-        match p |> P.match' else' with
-        | ifFalse::_ -> If(test, ifTrue, Some(ifFalse))
-        | _ -> If(test, ifTrue, None)
-      | _ -> P.matchError()
+      // ) <block>
+      p |> P.skipIf ")"
+      let ifTrue = p |> block
+
+      match p |> P.skipIfTry "else" with
+      | true -> If(test, ifTrue, Some(p |> block))
+      | false -> If(test, ifTrue, None)
     )
 
   //Function call
