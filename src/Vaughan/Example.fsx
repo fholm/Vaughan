@@ -84,7 +84,7 @@ let infix =
   P.infix (fun token left right -> 
     Binary(token |> toBinaryOp, left, right))
 
-//Utility function for defining infix operators
+//Utility function for defining right associative infix operators
 let infixr symbol = 
   P.infixr (fun token left right -> 
     Binary(token |> toBinaryOp, left, right)) symbol
@@ -154,13 +154,11 @@ let example_parser =
 
   //If/Else statement if(<condition>) { <exprs } [else { <exprs> }]
   |> P.smd "if" (fun _ p ->
-      // if(<test>
-      p |> P.skipIf "("
-      let test = p |> P.expr
-
-      // ) <block>
-      p |> P.skipIf ")"
-      let ifTrue = p |> block
+                              // if
+      p |> P.skipIf "("       // (
+      let test = p |> P.expr  // <test>
+      p |> P.skipIf ")"       // )
+      let ifTrue = p |> block // { block }
 
       match p |> P.skipIfTry "else" with
       | true -> If(test, ifTrue, Some(p |> block))

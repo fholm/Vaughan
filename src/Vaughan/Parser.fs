@@ -1,32 +1,11 @@
 ﻿namespace Vaughan
 
-module Parser = 
-  
-  (*
+(*
   F# implementation of a generic Top-Down-Operator-Precedence Parser 
   as described in this paper http://portal.acm.org/citation.cfm?id=512931.
+*)
 
-  The parser has been extended to allow for statements in comparison to Pratt's
-  original algorithm which only parsed languages which use expression-only grammar.
-
-  The parsers is "impure" in the sense that is uses a ref-cell for storing the
-  input in the T<_, _, _> record class, this is soley for performance reasons
-  as it's to expensive to create a new record object for every consumed token.
-  Certain functions also throw exceptions, which generally also is considered impure.
-
-  The parser produces nice error message in this style:
-
-  Error on line: 5 col: 9
-  4: if(x == y) {
-  5:   print'x equals y');
-  ----------^
-  Unexpected: #string "x equals y"
-
-  More information:
-  * http://en.wikipedia.org/wiki/Vaughan_Pratt (Original Inventor)
-  * http://effbot.org/zone/simple-top-down-parsing.htm (Python implementation)
-  * http://javascript.crockford.com/tdop/tdop.html (JavaScript implementation)
-  *)
+module Parser = 
 
   type Pos = int * int
 
@@ -38,14 +17,12 @@ module Parser =
       Position : 'a -> Pos
       PrettyPrint : ('a -> string) option
 
-      //Parser definitions and binding powers
       BindingPower : Map<'c, int>
       Null : Map<'c, 'a -> T<'a, 'b, 'c> -> 'b>
       Stmt : Map<'c, 'a -> T<'a, 'b, 'c> -> 'b>
       Left : Map<'c, 'a -> 'b -> T<'a, 'b, 'c> -> 'b>
   }
 
-  //Errors
   type Exn (msg, pos) = 
     inherit System.Exception(msg)
     member x.Position = pos
@@ -105,12 +82,15 @@ module Parser =
     | None -> (token |> parser.Type).ToString()
     | Some f -> token |> f
 
+  (*A simple exception, no source position*)
   let exn msg = Exn(msg, (0, 0)) |> raise
 
+  (*An exception with a source position*)
   let exnLine pos msg = 
     let line = sprintf "Error on line: %i col: %i\n" (fst pos) (snd pos)
     Exn(line + msg, pos) |> raise
 
+  (*An exception with source snippet and source position*)
   let exnSource token parser message =
     let pos = token |> parser.Position
     let source = parser.Source |> errorSource pos 
@@ -123,7 +103,7 @@ module Parser =
     exnSource token parser unexpected
 
   (*Returns the binding power for @token*)
-  let inline private getBindingPower token parser = 
+  let getBindingPower parser token = 
     let power = parser.BindingPower.TryFind (parser.Type token)
     match power with Some power -> power | _ -> 0
 
@@ -185,7 +165,7 @@ module Parser =
   let exprPwr rbpw parser =
     let rec expr left =
       match parser |> currentTry with
-      | Some token when rbpw < (parser |> getBindingPower token) -> 
+      | Some token when rbpw < (token |> getBindingPower parser) -> 
         parser |> skip
 
         let type' = parser.Type token

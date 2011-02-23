@@ -37,6 +37,7 @@
     <Compile Include="Parser.fs" />
     <Compile Include="Lexer.fs" />
     <None Include="Example.fsx" />
+    <None Include="Lexer.fsx" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
