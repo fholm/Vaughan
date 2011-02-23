@@ -24,7 +24,6 @@ module Parser =
 
   More information:
   * http://en.wikipedia.org/wiki/Vaughan_Pratt (Original Inventor)
-  * http://en.wikipedia.org/wiki/Pratt_parser (Alias name)
   * http://effbot.org/zone/simple-top-down-parsing.htm (Python implementation)
   * http://javascript.crockford.com/tdop/tdop.html (JavaScript implementation)
   *)
@@ -99,55 +98,68 @@ module Parser =
         //current line
         let text = source.[line-1]
         if column <= text.Length then
-          let arrow = "-" |> stringRepeat (nrl + column)
+          let arrow = "-" |> stringRepeat (nrl + column + 1)
           result := !result+nr+": "+text+"\n"+arrow+"^\n"
 
       !result
 
+  (*Pretty prints a token*)
+  let private prettyPrint parser token =
+    match parser.PrettyPrint with
+    | None -> (token |> parser.Type).ToString()
+    | Some f -> token |> f
+
   let exn msg = Exn(msg, (0, 0)) |> raise
+
   let exnLine pos msg = 
     let line = sprintf "Error on line: %i col: %i\n" (fst pos) (snd pos)
     Exn(line + msg, pos) |> raise
 
-  let private unexpectedEnd () = "Unexpected end of input" |> exn
-  let private unexpectedToken token parser =
-    let type' =
-      match parser.PrettyPrint with
-      | None -> (token |> parser.Type).ToString()
-      | Some f -> token |> f
-
+  let exnSource token parser message =
     let pos = token |> parser.Position
     let source = parser.Lines |> errorSource pos 
-    let expected = sprintf "Unexpected: %s" type'
-    (source + expected) |> exnLine pos
+    (source + message) |> exnLine pos
 
-  let inline private getBindingPower tok parser = 
-    let pwr = parser.BindingPower.TryFind (parser.Type tok)
-    match pwr with Some pwr -> pwr | _ -> 0
+  let private unexpectedEnd () = "Unexpected end of input" |> exn
+  let private unexpectedToken token parser =
+    let type' = token |> prettyPrint parser
+    let unexpected = sprintf "Unexpected: %s"  type'
+    exnSource token parser unexpected
 
+  (*Returns the binding power for @token*)
+  let inline private getBindingPower token parser = 
+    let power = parser.BindingPower.TryFind (parser.Type token)
+    match power with Some power -> power | _ -> 0
+
+  (*The current token or throws exception*)
   let current parser =  
     match !parser.Input with
     | token::_ -> token
     | _ -> unexpectedEnd ()
 
+  (*The current Some(token) or None*)
   let currentTry parser = 
     match !parser.Input with
     | token::_ -> Some token
     | _ -> None
 
+  (*The type of the current token or throws exception*)
   let currentType parser = 
     parser |> current |> parser.Type
 
+  (*The Some(type) of the current token or None*)
   let currentTypeTry parser =
     match parser |> currentTry with
     | Some token -> Some(token |> parser.Type)
     | _ -> None
 
+  (*Skips the current token or throws exception*)
   let skip parser =
     match !parser.Input with
     | _::input -> parser.Input := input
     | _ -> unexpectedEnd ()
 
+  (*Skips the current token if it's type is equal to type' or throws exception*)
   let skipIf type' parser =
     match !parser.Input with
     | token::xs when parser.Type token = type' -> 
@@ -158,11 +170,13 @@ module Parser =
 
     | _ -> unexpectedEnd ()
 
+  (*Gets the current token, skips it and then returns it*)
   let skipCurrent parser =
     let current = parser |> current
     parser |> skip
     current
    
+  (*Gets an expression where all tokesn have a binding power greater than rbpw*)
   let exprPwr rbpw parser =
     let rec expr left =
       match parser |> currentTry with
@@ -187,31 +201,37 @@ module Parser =
       | Some nud -> nud
 
     nud tok parser |> expr 
-
+    
+  (*Gets an expression where all tokens have a binding power greater than 0*)
   let expr parser = 
     parser |> exprPwr 0
-
+    
+  (*Gets an expression, and then skips the next token if it's type matches @type'*)
   let exprSkip type' parser =
     let expr = parser |> expr
     parser |> skipIf type'
     expr
-
+    
+  (*Tries to parse the whole input as a list of expressions*)
   let rec exprList parser =
     match !parser.Input with
     | [] -> []
     | _ -> (parser |> expr) :: (parser |> exprList)
-
+    
+  (*Tries to parse the next token as a statment or an expression that ends with @term*)
   let stmt term parser =
     let token = parser |> current
     match parser.Stmt.TryFind (token |> parser.Type) with
     | Some stmt -> parser |> skip; stmt token parser
     | None -> parser |> exprSkip term
-
+    
+  (*Tries to parse the whole input as a list of statements*)
   let rec stmtList term parser =
     match !parser.Input with
     | [] -> []
     | _ -> (parser |> stmt term) :: (parser |> stmtList term)
-
+    
+  (*Matches the current input, as far as needed, against the pattern supplied*)
   let match' pattern parser =
     let rec match' acc pattern parser =
       match pattern with
@@ -253,27 +273,27 @@ module Parser =
   let bpw token power parser = {parser with T.BindingPower = parser.BindingPower.Add(token, power)}
   
   (*Defines a left-associative infix operator*)
-  let infix f typ pwr p =
-    let infix tok left p = 
-      f tok left (p |> exprPwr pwr)
+  let infix f type' power parser =
+    let infix token left parser = 
+      f token left (parser |> exprPwr power)
 
-    p |> bpw typ pwr |> led typ infix
+    parser |> bpw type' power |> led type' infix
     
   (*Defines a right-associative infix operator*)
-  let infixr f typ pwr p =
-    let lpwr = pwr - 1
+  let infixr f type' power parser =
+    let lessPower = power - 1
 
-    let infix tok left p = 
-      f tok left (p |> exprPwr lpwr)
+    let infixr token left parser = 
+      f token left (parser |> exprPwr lessPower)
 
-    p |> bpw typ pwr |> led typ infix
+    parser |> bpw type' power |> led type' infixr
 
   (*Defines a prefix/unary operator*)
-  let prefix f typ pwr p =
+  let prefix f type' power parser =
     let prefix tok parser = 
-      f tok (parser |> exprPwr pwr)
+      f tok (parser |> exprPwr power)
 
-    p |> nud typ prefix
+    parser |> nud type' prefix
 
   (*Defines a constant*)
   let constant symbol value p =

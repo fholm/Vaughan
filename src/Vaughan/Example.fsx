@@ -83,15 +83,16 @@ let toUnaryOp tok =
 let infix = 
   P.infix (fun token left right -> 
     Binary(token |> toBinaryOp, left, right))
+
+//Utility function for defining infix operators
+let infixr symbol = 
+  P.infixr (fun token left right -> 
+    Binary(token |> toBinaryOp, left, right)) symbol
   
 //Utility function for defining prefix operators
 let prefix =
   P.prefix (fun token ast ->
     Unary(token |> toUnaryOp, ast))
-
-//Utility function for defining constants
-let constant typ value p =
-  p |> P.nud typ (fun _ _ -> value)
 
 //Utility function for parsing a block 
 let block p =
@@ -122,8 +123,8 @@ let example_parser =
   |> P.nud "#string" (fun t _ -> t |> value |> String)
 
   //Constants
-  |> constant "true" Ast.True
-  |> constant "false" Ast.False
+  |> P.constant "true" Ast.True
+  |> P.constant "false" Ast.False
   
   //Infix Operators <expr> <op> <expr>
   |> infix "==" 40
@@ -224,7 +225,7 @@ let tokens =
     //print("x equals y");
     identifier "print" (5, 3)
     lparen (5, 8)
-    string "x equals y" (5, 9)
+    string "x equals y" (5, 8)
     rparen (5, 21)
     scolon (5, 22)
 
