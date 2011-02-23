@@ -32,7 +32,7 @@ module Parser =
 
   type T<'a, 'b, 'c> when 'c : comparison = {
       Input : 'a list ref
-      Lines : string option
+      Source : string option
 
       Type : 'a -> 'c
       Position : 'a -> Pos
@@ -117,7 +117,7 @@ module Parser =
 
   let exnSource token parser message =
     let pos = token |> parser.Position
-    let source = parser.Lines |> errorSource pos 
+    let source = parser.Source |> errorSource pos 
     (source + message) |> exnLine pos
 
   let private unexpectedEnd () = "Unexpected end of input" |> exn
@@ -137,7 +137,7 @@ module Parser =
     | token::_ -> token
     | _ -> unexpectedEnd ()
 
-  (*The current Some(token) or None*)
+  (*The current Some(token) or None if empty*)
   let currentTry parser = 
     match !parser.Input with
     | token::_ -> Some token
@@ -147,7 +147,7 @@ module Parser =
   let currentType parser = 
     parser |> current |> parser.Type
 
-  (*The Some(type) of the current token or None*)
+  (*The Some(type) of the current token or None if empty*)
   let currentTypeTry parser =
     match parser |> currentTry with
     | Some token -> Some(token |> parser.Type)
@@ -159,7 +159,7 @@ module Parser =
     | _::input -> parser.Input := input
     | _ -> unexpectedEnd ()
 
-  (*Skips the current token if it's type is equal to type' or throws exception*)
+  (*Skips the current token if it's type is equal to @type' or throws exception*)
   let skipIf type' parser =
     match !parser.Input with
     | token::xs when parser.Type token = type' -> 
@@ -176,7 +176,7 @@ module Parser =
     parser |> skip
     current
    
-  (*Gets an expression where all tokesn have a binding power greater than rbpw*)
+  (*Gets an expression where all tokesn have a binding power greater than @rbpw*)
   let exprPwr rbpw parser =
     let rec expr left =
       match parser |> currentTry with
@@ -225,13 +225,13 @@ module Parser =
     | Some stmt -> parser |> skip; stmt token parser
     | None -> parser |> exprSkip term
     
-  (*Tries to parse the whole input as a list of statements*)
+  (*Tries to parse the whole input as a list of statements or expressions ending with @term*)
   let rec stmtList term parser =
     match !parser.Input with
     | [] -> []
     | _ -> (parser |> stmt term) :: (parser |> stmtList term)
     
-  (*Matches the current input, as far as needed, against the pattern supplied*)
+  (*Matches the current input, as far as needed, against the @pattern supplied*)
   let match' pattern parser =
     let rec match' acc pattern parser =
       match pattern with
@@ -254,7 +254,7 @@ module Parser =
 
   let create<'a, 'b, 'c when 'c : comparison> type' position prettyPrint = {
     Input = ref []
-    Lines = None
+    Source = None
     
     Type = type'
     Position = position
@@ -266,7 +266,7 @@ module Parser =
     Left = Map.empty<'c, 'a -> 'b -> T<'a, 'b, 'c> -> 'b>
   }
   
-  let matchError () = exn "Match pattern failed"
+  let matchError () = exn "Vaughan.Parser.Pattern<_, _, _> failed to match"
   let smd token funct parser = {parser with T.Stmt = parser.Stmt.Add(token, funct)}
   let nud token funct parser = {parser with T.Null = parser.Null.Add(token, funct)}
   let led token funct parser = {parser with T.Left = parser.Left.Add(token, funct)}
@@ -306,7 +306,7 @@ module Parser =
   let runExpr input source parser =
     {parser with 
       T.Input = ref input
-      T.Lines = source
+      T.Source = source
     } |> exprList
     
   (*  
@@ -316,5 +316,5 @@ module Parser =
   let runStmt input source term parser =
     {parser with 
       T.Input = ref input
-      T.Lines = source
+      T.Source = source
     } |> stmtList term
