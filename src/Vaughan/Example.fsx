@@ -1,5 +1,4 @@
 ﻿#load "Parser.fs"
-#load "Lexer.fs"
 
 //AST Types
 type UnaryOp
